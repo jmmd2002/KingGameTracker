@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>King Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>King Tracker</h1>
+    <span class="subtitle">Players</span>
+  </header>
+
+  <main>
+    <form id="add-form" class="add-form" autocomplete="off">
+      <label for="new-name" class="sr-only">New player name</label>
+      <input id="new-name" name="name" maxlength="40" placeholder="New player name" required>
+      <button type="submit" class="primary">Add</button>
+    </form>
+    <p id="form-error" class="error" role="alert" hidden></p>
+
+    <section class="controls" aria-label="Sorting">
+      <label class="field">
+        <span>Sort by</span>
+        <select id="sort-key"></select>
+      </label>
+      <label class="field" id="round-field" hidden>
+        <span>Round</span>
+        <select id="sort-round"></select>
+      </label>
+      <button id="sort-dir" type="button" class="icon" title="Toggle sort direction"></button>
+      <label class="check">
+        <input type="checkbox" id="show-archived"> Show removed
+      </label>
+    </section>
+
+    <p id="status" class="muted" role="status"></p>
+    <ul id="player-list" class="player-list"></ul>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
