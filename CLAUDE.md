@@ -53,7 +53,10 @@ reworking existing saved games.
 ## Tech stack
 
 - Backend: Python 3 + Flask, SQLite (stdlib `sqlite3`, no ORM). Node is not installed on the dev machine.
-- Frontend: plain HTML/CSS/JS in `app/static/`, no build step. Served by Flask.
+- Frontend: plain HTML/CSS/JS in `app/static/`, no build step, no external libraries. Served by Flask.
+  Card-table theme: felt green, ivory, gold, card red. Playfair Display for headings/KPIs, Inter for UI/data (Google Fonts, system fallbacks).
+  Colors are CSS tokens on `:root` with light/dark variants; win-rate heat cells use one felt-green sequential ramp (`--heat-0..6`).
+  Players render as playing-card avatars (initials + suit from id); rounds have mini-card glyphs (`ROUND_GLYPH` in app.js).
 - DB file: `instance/king.db` by default; override with the `KING_DB` env var.
 
 ## Layout
@@ -61,7 +64,8 @@ reworking existing saved games.
 - `app/rounds.py`: round types and scoring (single source of truth for rules)
 - `app/schema.sql`: database schema, applied on startup
 - `app/stats.py`: player statistics queries
-- `app/players.py`: `/api/players` and `/api/round-types` endpoints
+- `app/players.py`: API (`/api/players`, `/api/players/<id>` with game history, `/api/summary`, `/api/round-types`)
+- `app/static/`: single-page UI (players table, detail drawer with charts, mobile card layout below 760px)
 - `app/cli.py`: dev commands (`seed-demo`)
 - `tests/`: pytest suite
 
@@ -70,7 +74,9 @@ reworking existing saved games.
 - Install: `python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt`
 - Dev server: `.venv/bin/flask --app app run --debug` (add `--host 0.0.0.0` to open from a phone on the same network)
 - Tests: `.venv/bin/pytest`
-- Demo data (separate DB, refuses non-empty DBs): `KING_DB=instance/demo.db .venv/bin/flask --app app seed-demo`, then run the server with the same `KING_DB`.
+- Demo data (only into an empty DB): `.venv/bin/flask --app app seed-demo` (add `KING_DB=instance/demo.db` to keep it separate)
+- Wipe all data, e.g. before real use: `.venv/bin/flask --app app reset-db`
+- Visual check: there is no browser on the dev machine; screenshots are taken with Playwright from a scratch venv.
 
 ## Conventions
 

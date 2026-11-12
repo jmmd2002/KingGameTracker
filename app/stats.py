@@ -32,7 +32,8 @@ JOIN (SELECT round_id, MAX(points) AS points FROM round_scores GROUP BY round_id
 GROUP BY rs.player_id, r.round_type
 """
 
-GAME_STATS_SQL = """
+# Per finished game: each player's total and placement (ties share the better place).
+GAME_TOTALS_CTE = """
 WITH totals AS (
     SELECT r.game_id, rs.player_id, SUM(rs.points) AS total
     FROM round_scores rs
@@ -41,14 +42,31 @@ WITH totals AS (
     WHERE g.finished_at IS NOT NULL
     GROUP BY r.game_id, rs.player_id
 ),
-best AS (SELECT game_id, MAX(total) AS total FROM totals GROUP BY game_id)
-SELECT t.player_id,
-       COUNT(*)                 AS played,
-       SUM(t.total = b.total)   AS won,
-       AVG(t.total)             AS avg_points,
-       MAX(t.total)             AS best_total
-FROM totals t JOIN best b ON b.game_id = t.game_id
-GROUP BY t.player_id
+placed AS (
+    SELECT game_id, player_id, total,
+           RANK() OVER (PARTITION BY game_id ORDER BY total DESC) AS place,
+           COUNT(*) OVER (PARTITION BY game_id) AS seats
+    FROM totals
+)
+"""
+
+GAME_STATS_SQL = GAME_TOTALS_CTE + """
+SELECT player_id,
+       COUNT(*)          AS played,
+       SUM(place = 1)    AS won,
+       AVG(total)        AS avg_points,
+       MAX(total)        AS best_total,
+       AVG(place)        AS avg_place
+FROM placed
+GROUP BY player_id
+"""
+
+HISTORY_SQL = GAME_TOTALS_CTE + """
+SELECT p.game_id, g.started_at AS date, p.total, p.place, p.seats
+FROM placed p JOIN games g ON g.id = p.game_id
+WHERE p.player_id = ?
+ORDER BY g.started_at DESC, p.game_id DESC
+LIMIT ?
 """
 
 
@@ -80,7 +98,7 @@ def player_stats(
             "created_at": row["created_at"],
             "archived": row["archived_at"] is not None,
             "last_played_at": row["last_played_at"],
-            "games": {**_empty_bucket(), "best_total": None},
+            "games": {**_empty_bucket(), "best_total": None, "avg_place": None},
             "rounds": {rt.key: _empty_bucket() for rt in ROUND_TYPES},
             "rounds_overall": _empty_bucket(),
         }
@@ -120,6 +138,25 @@ def player_stats(
             win_rate=_rate(row["won"], row["played"]),
             avg_points=row["avg_points"],
             best_total=row["best_total"],
+            avg_place=row["avg_place"],
         )
 
     return list(players.values())
+
+
+def player_history(db: sqlite3.Connection, player_id: int, limit: int = 20) -> list[dict]:
+    """The player's most recent finished games, oldest first."""
+    rows = db.execute(HISTORY_SQL, (player_id, limit)).fetchall()
+    return [dict(r) for r in reversed(rows)]
+
+
+def summary(db: sqlite3.Connection) -> dict:
+    row = db.execute(
+        """SELECT
+             (SELECT COUNT(*) FROM players WHERE archived_at IS NULL) AS players,
+             (SELECT COUNT(*) FROM games WHERE finished_at IS NOT NULL) AS games,
+             (SELECT COUNT(*) FROM games WHERE finished_at IS NULL) AS games_in_progress,
+             (SELECT COUNT(*) FROM rounds) AS rounds,
+             (SELECT MAX(started_at) FROM games) AS last_game_at"""
+    ).fetchone()
+    return dict(row)

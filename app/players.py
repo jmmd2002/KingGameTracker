@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify, request
 
 from .db import get_db
 from .rounds import ROUND_TYPES
-from .stats import player_stats
+from .stats import player_history, player_stats, summary
 
 bp = Blueprint("players", __name__, url_prefix="/api")
 
@@ -70,6 +70,19 @@ def list_round_types():
 def list_players():
     include_archived = request.args.get("archived") in ("1", "true")
     return jsonify(player_stats(get_db(), include_archived=include_archived))
+
+
+@bp.get("/summary")
+def get_summary():
+    return jsonify(summary(get_db()))
+
+
+@bp.get("/players/<int:player_id>")
+def get_player(player_id: int):
+    db = get_db()
+    player = _get_player_or_404(db, player_id)
+    player["history"] = player_history(db, player_id)
+    return jsonify(player)
 
 
 @bp.post("/players")

@@ -76,3 +76,22 @@ def test_stats(client, add_game):
 def test_round_types_endpoint(client):
     keys = [r["key"] for r in client.get("/api/round-types").json]
     assert keys == ["vazas", "copas", "homens", "damas", "rei_de_copas", "ultimos_dois"]
+
+
+def test_history_placement_and_summary(client, add_game):
+    a, b, c, d = (create(client, n).json["id"] for n in "ABCD")
+    add_game([a, b, c, d], {"damas": [4, 0, 0, 0], "vazas": [0, 5, 4, 4]})  # A -400, B -250, C/D -200
+    add_game([a, b, c, d], {"damas": [0, 0, 0, 4]})  # D -400, others 0
+    add_game([a, b, c, d], {"copas": [13, 0, 0, 0]}, finished=False)
+
+    detail = client.get(f"/api/players/{a}").json
+    assert [(h["total"], h["place"], h["seats"]) for h in detail["history"]] == [(-400, 4, 4), (0, 1, 4)]
+    assert detail["games"]["avg_place"] == 2.5
+
+    c_hist = client.get(f"/api/players/{c}").json["history"]
+    assert [h["place"] for h in c_hist] == [1, 1]  # tied first, then shared first
+
+    assert client.get("/api/players/999").status_code == 404
+    assert client.get("/api/summary").json | {"last_game_at": None} == {
+        "players": 4, "games": 2, "games_in_progress": 1, "rounds": 4, "last_game_at": None,
+    }
